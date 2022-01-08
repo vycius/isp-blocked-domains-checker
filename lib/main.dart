@@ -5,12 +5,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:share_plus/share_plus.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-import 'excel_generator.dart';
 
 void main() {
   runApp(MyApp());
@@ -1315,7 +1312,47 @@ class _MyAppState extends State<MyApp> {
     ),
   ];
 
-  late List<Future<List<ResolvedDomain>>> _futures;
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Blokuoti domenai',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: DefaultTabController(
+        length: data.length,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Blokuoti domenai'),
+            bottom: TabBar(
+              isScrollable: true,
+              tabs: [
+                for (final institution in data)
+                  Tab(
+                    text: institution.name,
+                  ),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              for (var i = 0; i < data.length; i++)
+                InstitutionTab(institution: data[i]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class InstitutionTab extends StatelessWidget {
+  final Institution institution;
+
+  const InstitutionTab({
+    Key? key,
+    required this.institution,
+  }) : super(key: key);
 
   Future<bool> isDomainRegistered(String domain) async {
     // https://dns.google/resolve?name=visiaksasdasdasdas.lt&type=A&cd=true
@@ -1341,9 +1378,9 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<ResolvedDomain> resolveDomain(
-      Institution institution, String domain) async {
-    if (!await isDomainRegistered(domain)) {
+  Future<ResolvedDomain> resolveDomain(String domain) async {
+    if (!await isDomainRegistered(domain)
+        .onError((error, stackTrace) => true)) {
       return ResolvedDomain(
         domain: domain,
         resolvedIps: [],
@@ -1385,78 +1422,10 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  Future<List<ResolvedDomain>> resolveDomains(Institution institution) {
+  Future<List<ResolvedDomain>> resolveDomains() {
     return Future.wait(
-        institution.domains.map((d) => resolveDomain(institution, d)).toList());
+        institution.domains.map((d) => resolveDomain(d)).toList());
   }
-
-  @override
-  void initState() {
-    super.initState();
-
-    _futures = data.map((i) => resolveDomains(i)).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Blokuoti domenai',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: DefaultTabController(
-        length: data.length,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Blokuoti domenai'),
-            bottom: TabBar(
-              isScrollable: true,
-              tabs: [
-                for (final institution in data)
-                  Tab(
-                    text: institution.name,
-                  ),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              for (var i = 0; i < data.length; i++)
-                InstitutionTab(institution: data[i], future: _futures[i]),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () async {
-              final future = await Future.wait(_futures);
-
-              final sheet = ExcelGeneratorSheet(Workbook(), "Blokuoti domenai");
-              final builder = ExcelReportBuilder(context: context)
-                ..writeResolvedDomains(sheet, data, future);
-
-              final file = await builder.buildFile("blocked.xlsx");
-
-              await Share.shareFiles(
-                [file.path],
-                subject: "Blokuoti domenai",
-              );
-            },
-            child: const Icon(Icons.save),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class InstitutionTab extends StatelessWidget {
-  final Institution institution;
-  final Future<List<ResolvedDomain>> future;
-
-  const InstitutionTab({
-    Key? key,
-    required this.institution,
-    required this.future,
-  }) : super(key: key);
 
   Widget _getLeadingForResolvedDomain(ResolvedDomain resolvedDomain) {
     switch (resolvedDomain.status) {
@@ -1491,45 +1460,65 @@ class InstitutionTab extends StatelessWidget {
           final items = snapshot.requireData
             ..sort((a, b) => a.status.index.compareTo(b.status.index));
 
-          return ListView.separated(
-            itemCount: items.length + 1,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return DataTable(headingRowHeight: 0, columns: <DataColumn>[
-                  DataColumn(label: Container()),
-                  DataColumn(label: Container()),
-                ], rows: [
-                  for (final status in DomainStatus.values)
-                    DataRow(
-                      cells: [
-                        DataCell(Text(status.pluralName)),
-                        DataCell(
-                          Text(
-                            items
-                                .where((r) => r.status == status)
-                                .length
-                                .toString(),
+          return Scaffold(
+            floatingActionButton: FloatingActionButton(
+              onPressed: () async {
+                final availableDoamins = items
+                    .where((e) => e.status == DomainStatus.available)
+                    .toList();
+
+                final domains =
+                    availableDoamins.map((e) => e.domain).join("\n");
+
+                final ips = availableDoamins
+                    .map((e) => e.resolvedIps.join(", "))
+                    .join("\n");
+
+                await Clipboard.setData(
+                    ClipboardData(text: "$domains\n\n$ips"));
+              },
+              child: const Icon(Icons.save),
+            ),
+            body: ListView.separated(
+              itemCount: items.length + 1,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return DataTable(headingRowHeight: 0, columns: <DataColumn>[
+                    DataColumn(label: Container()),
+                    DataColumn(label: Container()),
+                  ], rows: [
+                    for (final status in DomainStatus.values)
+                      DataRow(
+                        cells: [
+                          DataCell(Text(status.pluralName)),
+                          DataCell(
+                            Text(
+                              items
+                                  .where((r) => r.status == status)
+                                  .length
+                                  .toString(),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                ]);
-              }
+                        ],
+                      ),
+                  ]);
+                }
 
-              final resolvedDomain = items[index - 1];
+                final resolvedDomain = items[index - 1];
 
-              return ListTile(
-                leading: _getLeadingForResolvedDomain(resolvedDomain),
-                title: Text(resolvedDomain.domain),
-                subtitle: Text(
-                  "${resolvedDomain.status.name}\n"
-                  "${resolvedDomain.resolvedIps.join(" ")}",
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => launch("http://${resolvedDomain.domain}"),
-              );
-            },
+                return ListTile(
+                  leading: _getLeadingForResolvedDomain(resolvedDomain),
+                  title: Text(resolvedDomain.domain),
+                  subtitle: Text(
+                    "${resolvedDomain.status.name}\n"
+                    "${resolvedDomain.resolvedIps.join(" ")}",
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => launch("http://${resolvedDomain.domain}"),
+                );
+              },
+            ),
           );
         }
 
@@ -1539,7 +1528,7 @@ class InstitutionTab extends StatelessWidget {
 
         return const Center(child: CircularProgressIndicator());
       },
-      future: future,
+      future: resolveDomains(),
     );
   }
 }

@@ -49,6 +49,11 @@ class _MyAppState extends State<MyApp> {
       title: 'Užblokuoti domenai',
       theme: ThemeData(
         primarySwatch: Colors.teal,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        primarySwatch: Colors.teal,
+        brightness: Brightness.dark,
       ),
       home: FutureBuilder<List<InstitutionAndBlockedDomains>>(
         future: _getInstitutionsAndBlockedDomains(),
@@ -181,22 +186,34 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
       case DomainStatus.available:
         return const CircleAvatar(
           backgroundColor: Colors.red,
-          child: Icon(Icons.error_outline),
+          child: Icon(
+            Icons.error_outline,
+            color: Colors.white,
+          ),
         );
       case DomainStatus.blocked:
         return const CircleAvatar(
           backgroundColor: Colors.green,
-          child: Icon(Icons.check),
+          child: Icon(
+            Icons.check,
+            color: Colors.white,
+          ),
         );
       case DomainStatus.nx:
         return const CircleAvatar(
           backgroundColor: Colors.blue,
-          child: Icon(Icons.lightbulb),
+          child: Icon(
+            Icons.lightbulb,
+            color: Colors.white,
+          ),
         );
       case DomainStatus.error:
         return const CircleAvatar(
           backgroundColor: Colors.orange,
-          child: Icon(Icons.warning_amber),
+          child: Icon(
+            Icons.warning_amber,
+            color: Colors.white,
+          ),
         );
     }
   }
@@ -227,7 +244,7 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
                   ClipboardData(text: "$domains\n\n$ips"),
                 );
               },
-              child: const Icon(Icons.save),
+              child: const Icon(Icons.copy_all),
             ),
             body: ListView.separated(
               itemCount: items.length + 1,

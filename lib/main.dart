@@ -164,7 +164,7 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
           status: DomainStatus.available,
         );
       }
-    } on SocketException catch (ex) {
+    } on SocketException {
       return ResolvedDomain(
         blockedDomain: blockedDomain,
         resolvedIps: [],

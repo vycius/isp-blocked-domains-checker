@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'models.dart';
 
@@ -93,7 +94,7 @@ class BlockedDomainsComponent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: institutionsAndBlockedDomains.length,
+      length: institutionsAndBlockedDomains.length + 1,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Užblokuoti domenai'),
@@ -105,19 +106,34 @@ class BlockedDomainsComponent extends StatelessWidget {
                 Tab(
                   text: institutionAndBlockedDomains.institution.name,
                 ),
+              const Tab(text: 'DNS'),
             ],
           ),
         ),
         body: TabBarView(
+          physics: const NeverScrollableScrollPhysics(),
           children: [
             for (final institutionAndBlockedDomains
                 in institutionsAndBlockedDomains)
               InstitutionAndBlockedDomainsTab(
                 institutionAndBlockedDomains: institutionAndBlockedDomains,
               ),
+            const DNSServerTab(),
           ],
         ),
       ),
+    );
+  }
+}
+
+class DNSServerTab extends StatelessWidget {
+  const DNSServerTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return const WebView(
+      initialUrl: 'https://browserleaks.com/dns',
+      javascriptMode: JavascriptMode.unrestricted,
     );
   }
 }

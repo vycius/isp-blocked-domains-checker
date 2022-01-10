@@ -141,12 +141,12 @@ class DNSServerTab extends StatelessWidget {
 class InstitutionAndBlockedDomainsTab extends StatelessWidget {
   final InstitutionAndBlockedDomains institutionAndBlockedDomains;
 
-  get blockIps => institutionAndBlockedDomains.institution.blockIps;
-
   const InstitutionAndBlockedDomainsTab({
     Key? key,
     required this.institutionAndBlockedDomains,
   }) : super(key: key);
+
+  get blockIps => institutionAndBlockedDomains.institution.blockIps;
 
   Future<ResolvedDomain> resolveDomain(BlockedDomain blockedDomain) async {
     if (!blockedDomain.recordExists) {
@@ -191,13 +191,133 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
 
   Future<List<ResolvedDomain>> resolveDomains() {
     final resolvedDomains = institutionAndBlockedDomains.blockedDomains
-        .map((d) => resolveDomain(d))
-        .toList();
+        .map((d) => resolveDomain(d));
 
     return Future.wait(resolvedDomains);
   }
 
-  Widget _getLeadingForResolvedDomain(ResolvedDomain resolvedDomain) {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<ResolvedDomain>>(
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return BlockedDomainsListComponent(
+            resolvedDomains: snapshot.requireData,
+          );
+        } else {
+          return const Center(child: CircularProgressIndicator());
+        }
+      },
+      future: resolveDomains(),
+    );
+  }
+}
+
+class BlockedDomainsListComponent extends StatelessWidget {
+  final List<ResolvedDomain> resolvedDomains;
+
+  const BlockedDomainsListComponent({
+    Key? key,
+    required this.resolvedDomains,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    resolvedDomains.sort((a, b) => a.status.index.compareTo(b.status.index));
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final availableDomains = resolvedDomains
+              .where((e) => e.status == DomainStatus.available)
+              .toList();
+
+          final domains =
+              availableDomains.map((e) => e.blockedDomain).join("\n");
+
+          final ips =
+              availableDomains.map((e) => e.resolvedIps.join(", ")).join("\n");
+
+          await Clipboard.setData(
+            ClipboardData(text: "$domains\n\n$ips"),
+          );
+        },
+        child: const Icon(Icons.copy_all),
+      ),
+      body: ListView.separated(
+        itemCount: resolvedDomains.length + 1,
+        separatorBuilder: (context, index) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return SummaryTableComponent(
+              resolvedDomains: resolvedDomains,
+            );
+          } else {
+            return ResolvedDomainComponent(
+              resolvedDomain: resolvedDomains[index - 1],
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class SummaryTableComponent extends StatelessWidget {
+  final List<ResolvedDomain> resolvedDomains;
+
+  const SummaryTableComponent({
+    Key? key,
+    required this.resolvedDomains,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return DataTable(headingRowHeight: 0, columns: <DataColumn>[
+      DataColumn(label: Container()),
+      DataColumn(label: Container()),
+    ], rows: [
+      for (final status in DomainStatus.values)
+        DataRow(
+          cells: [
+            DataCell(Text(status.pluralName)),
+            DataCell(
+              Text(
+                resolvedDomains
+                    .where((r) => r.status == status)
+                    .length
+                    .toString(),
+              ),
+            ),
+          ],
+        ),
+    ]);
+  }
+}
+
+class ResolvedDomainComponent extends StatelessWidget {
+  final ResolvedDomain resolvedDomain;
+
+  const ResolvedDomainComponent({Key? key, required this.resolvedDomain})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: _getLeadingForResolvedDomain(),
+      title: Text(resolvedDomain.blockedDomain.domain),
+      subtitle: Text(
+        "${resolvedDomain.status.name}\n"
+        "${resolvedDomain.resolvedIps.join(" ")}",
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => launch(
+        "http://${resolvedDomain.blockedDomain.domain}",
+      ),
+    );
+  }
+
+  Widget _getLeadingForResolvedDomain() {
     switch (resolvedDomain.status) {
       case DomainStatus.available:
         return const CircleAvatar(
@@ -232,88 +352,5 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
           ),
         );
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<ResolvedDomain>>(
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          final items = snapshot.requireData
-            ..sort((a, b) => a.status.index.compareTo(b.status.index));
-
-          return Scaffold(
-            floatingActionButton: FloatingActionButton(
-              onPressed: () async {
-                final availableDomains = items
-                    .where((e) => e.status == DomainStatus.available)
-                    .toList();
-
-                final domains =
-                    availableDomains.map((e) => e.blockedDomain).join("\n");
-
-                final ips = availableDomains
-                    .map((e) => e.resolvedIps.join(", "))
-                    .join("\n");
-
-                await Clipboard.setData(
-                  ClipboardData(text: "$domains\n\n$ips"),
-                );
-              },
-              child: const Icon(Icons.copy_all),
-            ),
-            body: ListView.separated(
-              itemCount: items.length + 1,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return DataTable(headingRowHeight: 0, columns: <DataColumn>[
-                    DataColumn(label: Container()),
-                    DataColumn(label: Container()),
-                  ], rows: [
-                    for (final status in DomainStatus.values)
-                      DataRow(
-                        cells: [
-                          DataCell(Text(status.pluralName)),
-                          DataCell(
-                            Text(
-                              items
-                                  .where((r) => r.status == status)
-                                  .length
-                                  .toString(),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ]);
-                }
-
-                final resolvedDomain = items[index - 1];
-
-                return ListTile(
-                  leading: _getLeadingForResolvedDomain(resolvedDomain),
-                  title: Text(resolvedDomain.blockedDomain.domain),
-                  subtitle: Text(
-                    "${resolvedDomain.status.name}\n"
-                    "${resolvedDomain.resolvedIps.join(" ")}",
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => launch(
-                    "http://${resolvedDomain.blockedDomain.domain}",
-                  ),
-                );
-              },
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Text(snapshot.error?.toString() ?? "Unknown error");
-        }
-
-        return const Center(child: CircularProgressIndicator());
-      },
-      future: resolveDomains(),
-    );
   }
 }

@@ -205,7 +205,20 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
             resolvedDomains: snapshot.requireData,
           );
         } else {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+              child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              CircularProgressIndicator(),
+              Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  'Prašome palaukti...\nTikrinimo procesas gali užtrukti iki keleto minučių',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            ],
+          ));
         }
       },
       future: resolveDomains(),

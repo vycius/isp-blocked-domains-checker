@@ -14,7 +14,7 @@ extension DomainStatusExtension on DomainStatus {
       case DomainStatus.nx:
         return "Domenas neegzistuoja";
       case DomainStatus.error:
-        return "Klaida";
+        return "Nepavyko nustatyti";
     }
   }
 
@@ -27,7 +27,7 @@ extension DomainStatusExtension on DomainStatus {
       case DomainStatus.nx:
         return "Neegzistuojantys domenai";
       case DomainStatus.error:
-        return "Klaidos";
+        return "Nepavyko nustatyti";
     }
   }
 }

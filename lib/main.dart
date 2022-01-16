@@ -47,7 +47,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Užblokuoti domenai',
+      title: 'Blokuoti domenai',
       theme: ThemeData(
         primarySwatch: Colors.teal,
         brightness: Brightness.light,
@@ -97,7 +97,7 @@ class BlockedDomainsComponent extends StatelessWidget {
       length: institutionsAndBlockedDomains.length + 1,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Užblokuoti domenai'),
+          title: const Text('Blokuoti domenai'),
           bottom: TabBar(
             isScrollable: true,
             tabs: [
@@ -257,20 +257,23 @@ class BlockedDomainsListComponent extends StatelessWidget {
         },
         child: const Icon(Icons.copy_all),
       ),
-      body: ListView.separated(
-        itemCount: resolvedDomains.length + 1,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return SummaryTableComponent(
-              resolvedDomains: resolvedDomains,
-            );
-          } else {
-            return ResolvedDomainComponent(
-              resolvedDomain: resolvedDomains[index - 1],
-            );
-          }
-        },
+      body: Scrollbar(
+        interactive: true,
+        child: ListView.separated(
+          itemCount: resolvedDomains.length + 1,
+          separatorBuilder: (context, index) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return SummaryTableComponent(
+                resolvedDomains: resolvedDomains,
+              );
+            } else {
+              return ResolvedDomainComponent(
+                resolvedDomain: resolvedDomains[index - 1],
+              );
+            }
+          },
+        ),
       ),
     );
   }

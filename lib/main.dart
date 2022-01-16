@@ -148,7 +148,10 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
 
   get blockIps => institutionAndBlockedDomains.institution.blockIps;
 
-  Future<ResolvedDomain> resolveDomain(BlockedDomain blockedDomain) async {
+  Future<ResolvedDomain> resolveDomain(
+    BlockedDomain blockedDomain, {
+    int retriesLeft = 3,
+  }) async {
     if (!blockedDomain.recordExists) {
       return ResolvedDomain(
         blockedDomain: blockedDomain,
@@ -181,11 +184,16 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
         );
       }
     } on SocketException {
-      return ResolvedDomain(
-        blockedDomain: blockedDomain,
-        resolvedIps: [],
-        status: DomainStatus.error,
-      );
+      if (retriesLeft == 0) {
+        return ResolvedDomain(
+          blockedDomain: blockedDomain,
+          resolvedIps: [],
+          status: DomainStatus.error,
+        );
+      } else {
+        await Future.delayed(const Duration(milliseconds: 300));
+        return resolveDomain(blockedDomain, retriesLeft: retriesLeft - 1);
+      }
     }
   }
 

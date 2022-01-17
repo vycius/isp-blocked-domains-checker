@@ -6,23 +6,24 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'models.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const App());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+class App extends StatefulWidget {
+  const App({Key? key}) : super(key: key);
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<App> createState() => _AppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _AppState extends State<App> {
   static const blockedDomainsUrl =
       'https://raw.githubusercontent.com/vycius/isp-blocked-domains-lt/main/isp-blocked-domains.json';
 
@@ -42,6 +43,13 @@ class _MyAppState extends State<MyApp> {
           .map((x) => InstitutionAndBlockedDomains.fromJson(x)),
       growable: false,
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    Intl.defaultLocale = 'lt';
   }
 
   @override
@@ -104,7 +112,8 @@ class BlockedDomainsComponent extends StatelessWidget {
               for (final institutionAndBlockedDomains
                   in institutionsAndBlockedDomains)
                 Tab(
-                  text: institutionAndBlockedDomains.institution.name,
+                  text: institutionAndBlockedDomains.institution.name
+                      .toUpperCase(),
                 ),
               const Tab(text: 'DNS'),
             ],
@@ -289,33 +298,40 @@ class BlockedDomainsListComponent extends StatelessWidget {
 
 class SummaryTableComponent extends StatelessWidget {
   final List<ResolvedDomain> resolvedDomains;
+  final _formatter = NumberFormat.decimalPercentPattern(decimalDigits: 1);
 
-  const SummaryTableComponent({
+  SummaryTableComponent({
     Key? key,
     required this.resolvedDomains,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final hasErrors =
+        resolvedDomains.any((r) => r.status != DomainStatus.error);
+
     return DataTable(headingRowHeight: 0, columns: <DataColumn>[
+      DataColumn(label: Container()),
       DataColumn(label: Container()),
       DataColumn(label: Container()),
     ], rows: [
       for (final status in DomainStatus.values)
-        DataRow(
-          cells: [
-            DataCell(Text(status.pluralName)),
-            DataCell(
-              Text(
-                resolvedDomains
-                    .where((r) => r.status == status)
-                    .length
-                    .toString(),
-              ),
-            ),
-          ],
-        ),
+        if (status != DomainStatus.error || !hasErrors) _buildDataRow(status),
     ]);
+  }
+
+  DataRow _buildDataRow(DomainStatus status) {
+    final count = resolvedDomains.where((r) => r.status == status).length;
+    final total = resolvedDomains.length;
+    final formattedPercentage = _formatter.format(count / total);
+
+    return DataRow(
+      cells: [
+        DataCell(Text(status.pluralName)),
+        DataCell(Text('$count')),
+        DataCell(Text(formattedPercentage)),
+      ],
+    );
   }
 }
 

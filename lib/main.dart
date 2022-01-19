@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -220,6 +222,7 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
         if (snapshot.hasData) {
           return BlockedDomainsListComponent(
             resolvedDomains: snapshot.requireData,
+            institution: institutionAndBlockedDomains.institution,
           );
         } else {
           return Center(
@@ -245,10 +248,12 @@ class InstitutionAndBlockedDomainsTab extends StatelessWidget {
 
 class BlockedDomainsListComponent extends StatelessWidget {
   final List<ResolvedDomain> resolvedDomains;
+  final Institution institution;
 
   const BlockedDomainsListComponent({
     Key? key,
     required this.resolvedDomains,
+    required this.institution,
   }) : super(key: key);
 
   @override
@@ -257,22 +262,8 @@ class BlockedDomainsListComponent extends StatelessWidget {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final availableDomains = resolvedDomains
-              .where((e) => e.status == DomainStatus.available)
-              .toList();
-
-          final domains =
-              availableDomains.map((e) => e.blockedDomain).join("\n");
-
-          final ips =
-              availableDomains.map((e) => e.resolvedIps.join(", ")).join("\n");
-
-          await Clipboard.setData(
-            ClipboardData(text: "$domains\n\n$ips"),
-          );
-        },
-        child: const Icon(Icons.copy_all),
+        onPressed: _createAndOpenCsv,
+        child: const Icon(Icons.save_alt),
       ),
       body: Scrollbar(
         interactive: true,
@@ -293,6 +284,36 @@ class BlockedDomainsListComponent extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future _createAndOpenCsv() async {
+    final resolvedDomainsRows = resolvedDomains
+        .map((d) =>
+            [d.blockedDomain.domain, d.status.name, d.resolvedIps.join(',')])
+        .toList();
+
+    final csvRows = [
+      ['Domenas', 'Statusas', 'IP'],
+      ...resolvedDomainsRows,
+    ];
+
+    final csv = const ListToCsvConverter().convert(csvRows);
+    print(csv);
+
+    final directory = await getApplicationDocumentsDirectory();
+    final fileNameRaw =
+        '${institution.name}-${DateTime.now().toIso8601String()}';
+    final fileName = fileNameRaw.replaceAll(' ', '-');
+
+    final fullPath = '${directory.path}/$fileName.csv';
+
+    final file = await File(fullPath).writeAsString(csv, flush: true);
+
+    return Share.shareFiles(
+      [file.path],
+      subject: fileNameRaw,
+    );
+
   }
 }
 
